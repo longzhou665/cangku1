@@ -21,6 +21,8 @@ class EarningsEvent:
     report_date_et: str
     session_cn: str
     report_date_bj: str
+    event_time_bj: str
+    bj_time_hint: str
     eps_estimate: str
     revenue_estimate: str
 
@@ -103,6 +105,17 @@ def _hour_to_session(hour: str) -> tuple[str, time]:
     return "未知", time(9, 30)
 
 
+def _build_bj_time_hint(session_cn: str, dt_bj: datetime) -> str:
+    dt_text = dt_bj.strftime("%Y-%m-%d %H:%M")
+    if session_cn == "盘前":
+        return f"{dt_text}前"
+    if session_cn == "盘后":
+        return f"{dt_text}后"
+    if session_cn == "盘中":
+        return f"{dt_text}左右"
+    return dt_text
+
+
 def _fmt_number(value: object) -> str:
     if value is None:
         return "N/A"
@@ -149,6 +162,8 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
         report_date_et=report_date_et,
         session_cn=session_cn,
         report_date_bj=dt_bj.strftime("%Y-%m-%d"),
+        event_time_bj=dt_bj.strftime("%H:%M"),
+        bj_time_hint=_build_bj_time_hint(session_cn, dt_bj),
         eps_estimate=_fmt_number(row.get("epsEstimate")),
         revenue_estimate=_fmt_revenue(row.get("revenueEstimate")),
     )
@@ -157,18 +172,10 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
 def _build_message(events: list[EarningsEvent]) -> str:
     today_bj = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
-    for days_until, item in events:
-        if days_until == 7:
-            remind_label = "提前7天提醒"
-        elif days_until == 1:
-            remind_label = "财报前1天提醒"
-        elif days_until == 0:
-            remind_label = "财报当天提醒"
-        else:
-            remind_label = f"提前{days_until}天提醒"
+    for _, item in events:
         lines.append(
-            f"- {item.symbol} | {remind_label} | 财报日(北京时间): {item.report_date_bj} | {item.session_cn} | "
-            f"财报日(美东): {item.report_date_et} | EPS预期: {item.eps_estimate} | 营收预期: {item.revenue_estimate}"
+            f"- {item.symbol} | 财报日(北京时间): {item.report_date_bj} | {item.session_cn} | "
+            f"预计北京时间: {item.bj_time_hint} | EPS预期: {item.eps_estimate} | 营收预期: {item.revenue_estimate}"
         )
     return "\n".join(lines)
 
