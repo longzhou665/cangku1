@@ -119,25 +119,59 @@ def _build_message(events: list[EarningsEvent]) -> str:
     return "\n".join(lines)
 
 
+def _read_http_error_body(exc: urllib.error.HTTPError) -> str:
+    try:
+        raw = exc.read()
+    except Exception:
+        return ""
+    if not raw:
+        return ""
+    return raw.decode("utf-8", errors="ignore")
+
+
 def _push_webhook(webhook_url: str, events: list[EarningsEvent], message: str) -> None:
-    payload = {
-        "text": message,
-        "markdown": message,
-        "events": [event.__dict__ for event in events],
-    }
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        webhook_url,
-        data=body,
-        method="POST",
-        headers={"Content-Type": "application/json; charset=utf-8"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        code = resp.getcode()
-        resp_text = resp.read().decode("utf-8", errors="ignore")
-    print(f"Webhook 推送完成, HTTP {code}")
-    if resp_text:
-        print(f"Webhook 返回: {resp_text[:500]}")
+    # Whop feed webhook commonly accepts `content` (and optional `username`).
+    # Keep backward-compatible payloads as fallback for other webhook providers.
+    candidate_payloads = [
+        {"content": message, "username": "财报提醒"},
+        {"content": message},
+        {
+            "text": message,
+            "markdown": message,
+            "events": [event.__dict__ for event in events],
+        },
+    ]
+
+    last_error: Exception | None = None
+    for idx, payload in enumerate(candidate_payloads, start=1):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            webhook_url,
+            data=body,
+            method="POST",
+            headers={"Content-Type": "application/json; charset=utf-8"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                code = resp.getcode()
+                resp_text = resp.read().decode("utf-8", errors="ignore")
+            print(f"Webhook 推送完成, HTTP {code}, payload尝试={idx}")
+            if resp_text:
+                print(f"Webhook 返回: {resp_text[:500]}")
+            return
+        except urllib.error.HTTPError as exc:
+            detail = _read_http_error_body(exc)
+            print(
+                f"Webhook 尝试失败, payload尝试={idx}, HTTPError: {exc.code} {exc.reason}"
+            )
+            if detail:
+                print(f"Webhook 错误详情: {detail[:1000]}")
+            last_error = exc
+        except Exception as exc:
+            print(f"Webhook 尝试失败, payload尝试={idx}, 错误: {exc}")
+            last_error = exc
+    if last_error:
+        raise last_error
 
 
 def main() -> int:
@@ -166,6 +200,9 @@ def main() -> int:
         rows = _fetch_earnings(token, from_date=from_date, to_date=to_date)
     except urllib.error.HTTPError as exc:
         print(f"拉取财报日历失败, HTTPError: {exc.code} {exc.reason}")
+        detail = _read_http_error_body(exc)
+        if detail:
+            print(f"拉取财报日历错误详情: {detail[:1000]}")
         return 1
     except urllib.error.URLError as exc:
         print(f"拉取财报日历失败, URLError: {exc.reason}")
