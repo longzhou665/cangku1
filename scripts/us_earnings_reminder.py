@@ -183,7 +183,7 @@ def _build_message(events: list[EarningsEvent]) -> str:
         elif item.session_cn == "盘中":
             bj_time_label += "左右"
         lines.append(
-            f"- {item.symbol} | 财报日(北京时间): {bj_time_label}"
+            f"- {item.symbol} | 北京时间: {bj_time_label}"
         )
     return "\n".join(lines)
 
