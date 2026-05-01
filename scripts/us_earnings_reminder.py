@@ -97,9 +97,11 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
 def _hour_to_session(hour: str) -> tuple[str, time]:
     normalized = (hour or "").strip().lower()
     if normalized == "bmo":
-        return "盘前", time(8, 0)
+        # 按美股盘前开始时刻(04:00 ET)给出提醒时间锚点
+        return "盘前", time(4, 0)
     if normalized == "amc":
-        return "盘后", time(16, 30)
+        # 按美股收盘时刻(16:00 ET)给出提醒时间锚点
+        return "盘后", time(16, 0)
     if normalized == "dmh":
         return "盘中", time(12, 0)
     return "未知", time(9, 30)
@@ -173,9 +175,16 @@ def _build_message(events: list[EarningsEvent]) -> str:
     today_bj = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
     for _, item in events:
+        bj_time_label = f"{item.report_date_bj} {item.event_time_bj}"
+        if item.session_cn == "盘后":
+            bj_time_label += "后"
+        elif item.session_cn == "盘前":
+            bj_time_label += "前"
+        elif item.session_cn == "盘中":
+            bj_time_label += "左右"
         lines.append(
-            f"- {item.symbol} | 财报日(北京时间): {item.report_date_bj} | {item.session_cn} | "
-            f"预计北京时间: {item.bj_time_hint} | EPS预期: {item.eps_estimate} | 营收预期: {item.revenue_estimate}"
+            f"- {item.symbol} | 财报日(北京时间): {bj_time_label} | "
+            f"EPS预期: {item.eps_estimate} | 营收预期: {item.revenue_estimate}"
         )
     return "\n".join(lines)
 
