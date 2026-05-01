@@ -82,6 +82,24 @@ def _fmt_number(value: object) -> str:
     return str(value)
 
 
+def _fmt_revenue(value: object) -> str:
+    if value is None:
+        return "N/A"
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    abs_num = abs(num)
+    if abs_num >= 1_000_000_000:
+        return f"${num / 1_000_000_000:.2f}B ({num:,.0f})"
+    if abs_num >= 1_000_000:
+        return f"${num / 1_000_000:.2f}M ({num:,.0f})"
+    if abs_num >= 1_000:
+        return f"${num / 1_000:.2f}K ({num:,.0f})"
+    return f"${num:,.0f}"
+
+
 def _normalize_event(row: dict) -> EarningsEvent | None:
     symbol = str(row.get("symbol", "")).strip().upper()
     report_date_et = str(row.get("date", "")).strip()
@@ -104,7 +122,7 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
         session_cn=session_cn,
         report_date_bj=dt_bj.strftime("%Y-%m-%d"),
         eps_estimate=_fmt_number(row.get("epsEstimate")),
-        revenue_estimate=_fmt_number(row.get("revenueEstimate")),
+        revenue_estimate=_fmt_revenue(row.get("revenueEstimate")),
     )
 
 
