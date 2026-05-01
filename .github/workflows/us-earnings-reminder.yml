@@ -1,5 +1,5 @@
 name: US Earnings Reminder
-
+# refresh
 on:
   schedule:
     - cron: "0 0 * * 1-5"
