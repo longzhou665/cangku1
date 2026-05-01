@@ -2,7 +2,10 @@ name: US Earnings Reminder
 # refresh
 on:
   schedule:
-    - cron: "0 0 * * 1-5"
+    # 04:00 ET premarket open.
+    # EDT: 08:00 UTC, EST: 09:00 UTC
+    - cron: "0 8 * * 1-5"
+    - cron: "0 9 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -25,6 +28,7 @@ jobs:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           EARNINGS_WHITELIST: ${{ secrets.EARNINGS_WHITELIST }}
           REMINDER_OFFSETS: ${{ vars.REMINDER_OFFSETS || '0,1,7' }}
+          PREMARKET_ONLY: ${{ vars.PREMARKET_ONLY || 'true' }}
           LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '1' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '0' }}
         run: python scripts/us_earnings_reminder.py

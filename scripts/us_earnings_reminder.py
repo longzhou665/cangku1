@@ -60,6 +60,17 @@ def _optional_offsets(name: str, default: tuple[int, ...]) -> tuple[int, ...]:
     return offsets
 
 
+def _optional_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes", "y", "on"}:
+        return True
+    if raw in {"0", "false", "no", "n", "off"}:
+        return False
+    raise ValueError(f"环境变量 {name} 需要是布尔值, 当前值: {raw}")
+
+
 def _parse_watchlist(raw: str) -> set[str]:
     return {x.strip().upper() for x in raw.split(",") if x.strip()}
 
@@ -226,6 +237,7 @@ def main() -> int:
         reminder_offsets = _optional_offsets("REMINDER_OFFSETS", (0, 1, 7))
         lookahead_days = _optional_int("LOOKAHEAD_DAYS", 1)
         lookback_days = _optional_int("LOOKBACK_DAYS", 0)
+        premarket_only = _optional_bool("PREMARKET_ONLY", True)
     except ValueError as exc:
         print(str(exc))
         return 2
@@ -233,6 +245,13 @@ def main() -> int:
     watchlist = _parse_watchlist(watchlist_raw)
     if not watchlist:
         print("EARNINGS_WHITELIST 为空, 无需处理")
+        return 0
+
+    now_et_dt = datetime.now(ET_TZ)
+    if premarket_only and now_et_dt.hour != 4:
+        print(
+            f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前开始时刻(04点), 跳过执行"
+        )
         return 0
 
     now_et = datetime.now(ET_TZ).date()

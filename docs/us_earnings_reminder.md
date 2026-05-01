@@ -26,12 +26,13 @@
 ### Variables（可选）
 
 - `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
+- `PREMARKET_ONLY`：是否仅在美东盘前开始（04:00 ET）执行，默认 `true`
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
 - `LOOKBACK_DAYS`：向前回看天数，默认 `0`
 
 ## 运行方式
 
-- 自动：工作流在每个工作日 UTC 00:00 定时执行
+- 自动：工作流在每个工作日 `08:00 UTC` 与 `09:00 UTC` 触发，脚本按美东时间只放行 `04:00 ET`，可自动适配夏令时/冬令时
 - 手动：在 GitHub Actions 页面使用 `workflow_dispatch` 触发
 
 ## 推送内容
