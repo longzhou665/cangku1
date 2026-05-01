@@ -120,13 +120,12 @@ def _fmt_revenue(value: object) -> str:
         return str(value)
 
     abs_num = abs(num)
-    if abs_num >= 1_000_000_000:
-        return f"${num / 1_000_000_000:.2f}B ({num:,.0f})"
-    if abs_num >= 1_000_000:
-        return f"${num / 1_000_000:.2f}M ({num:,.0f})"
-    if abs_num >= 1_000:
-        return f"${num / 1_000:.2f}K ({num:,.0f})"
-    return f"${num:,.0f}"
+    sign = "-" if num < 0 else ""
+    if abs_num >= 100_000_000:
+        return f"{sign}约 {abs_num / 100_000_000:.2f} 亿美元"
+    if abs_num >= 10_000:
+        return f"{sign}约 {abs_num / 10_000:.2f} 万美元"
+    return f"{sign}约 {abs_num:.0f} 美元"
 
 
 def _normalize_event(row: dict) -> EarningsEvent | None:
