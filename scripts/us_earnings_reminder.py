@@ -301,6 +301,16 @@ def main() -> int:
         print("本次无白名单股票财报事件, 不推送")
         return 0
 
+    # 二次白名单过滤（发送前双保险）
+    before_second_filter = len(matched)
+    matched = [x for x in matched if x[1].symbol in watchlist]
+    dropped = before_second_filter - len(matched)
+    if dropped > 0:
+        print(f"二次白名单过滤已丢弃 {dropped} 条非白名单事件")
+    if not matched:
+        print("二次白名单过滤后无可推送事件")
+        return 0
+
     matched.sort(key=lambda x: (x[0], x[1].report_date_bj, x[1].symbol))
     message = _build_message(matched)
     print(message)
