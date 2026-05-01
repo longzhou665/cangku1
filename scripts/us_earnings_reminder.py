@@ -97,8 +97,8 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
 def _hour_to_session(hour: str) -> tuple[str, time]:
     normalized = (hour or "").strip().lower()
     if normalized == "bmo":
-        # 按美股盘前开始时刻(04:00 ET)给出提醒时间锚点
-        return "盘前", time(4, 0)
+        # 按美股正式开盘时刻(09:30 ET)给出盘前提醒时间锚点
+        return "盘前", time(9, 30)
     if normalized == "amc":
         # 按美股收盘时刻(16:00 ET)给出提醒时间锚点
         return "盘后", time(16, 0)
