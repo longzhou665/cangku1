@@ -24,6 +24,7 @@ jobs:
           FINNHUB_API_TOKEN: ${{ secrets.FINNHUB_API_TOKEN }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           EARNINGS_WHITELIST: ${{ secrets.EARNINGS_WHITELIST }}
+          REMINDER_OFFSETS: ${{ vars.REMINDER_OFFSETS || '0,1,7' }}
           LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '1' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '0' }}
         run: python scripts/us_earnings_reminder.py

@@ -42,6 +42,24 @@ def _optional_int(name: str, default: int) -> int:
         raise ValueError(f"环境变量 {name} 需要是整数, 当前值: {raw}") from exc
 
 
+def _optional_offsets(name: str, default: tuple[int, ...]) -> tuple[int, ...]:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    parts = [x.strip() for x in raw.split(",") if x.strip()]
+    try:
+        offsets = tuple(sorted({int(x) for x in parts}))
+    except ValueError as exc:
+        raise ValueError(
+            f"环境变量 {name} 需要是逗号分隔整数, 当前值: {raw}"
+        ) from exc
+    if not offsets:
+        raise ValueError(f"环境变量 {name} 不能为空")
+    if any(x < 0 for x in offsets):
+        raise ValueError(f"环境变量 {name} 不能包含负数, 当前值: {raw}")
+    return offsets
+
+
 def _parse_watchlist(raw: str) -> set[str]:
     return {x.strip().upper() for x in raw.split(",") if x.strip()}
 
@@ -129,9 +147,17 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
 def _build_message(events: list[EarningsEvent]) -> str:
     today_bj = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
-    for item in events:
+    for days_until, item in events:
+        if days_until == 7:
+            remind_label = "提前7天提醒"
+        elif days_until == 1:
+            remind_label = "财报前1天提醒"
+        elif days_until == 0:
+            remind_label = "财报当天提醒"
+        else:
+            remind_label = f"提前{days_until}天提醒"
         lines.append(
-            f"- {item.symbol} | 财报日(北京时间): {item.report_date_bj} | {item.session_cn} | "
+            f"- {item.symbol} | {remind_label} | 财报日(北京时间): {item.report_date_bj} | {item.session_cn} | "
             f"财报日(美东): {item.report_date_et} | EPS预期: {item.eps_estimate} | 营收预期: {item.revenue_estimate}"
         )
     return "\n".join(lines)
@@ -197,6 +223,7 @@ def main() -> int:
         token = _require_env("FINNHUB_API_TOKEN")
         webhook_url = _require_env("WEBHOOK_URL")
         watchlist_raw = _require_env("EARNINGS_WHITELIST")
+        reminder_offsets = _optional_offsets("REMINDER_OFFSETS", (0, 1, 7))
         lookahead_days = _optional_int("LOOKAHEAD_DAYS", 1)
         lookback_days = _optional_int("LOOKBACK_DAYS", 0)
     except ValueError as exc:
@@ -209,10 +236,14 @@ def main() -> int:
         return 0
 
     now_et = datetime.now(ET_TZ).date()
+    today_bj = datetime.now(BJ_TZ).date()
+    max_reminder_offset = max(reminder_offsets)
+    effective_lookahead = max(lookahead_days, max_reminder_offset + 1)
     from_date = (now_et - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    to_date = (now_et + timedelta(days=lookahead_days)).strftime("%Y-%m-%d")
+    to_date = (now_et + timedelta(days=effective_lookahead)).strftime("%Y-%m-%d")
     print(f"查询区间(美东): {from_date} -> {to_date}")
     print(f"白名单股票: {', '.join(sorted(watchlist))}")
+    print(f"提醒偏移天数(北京时间): {reminder_offsets}")
 
     try:
         rows = _fetch_earnings(token, from_date=from_date, to_date=to_date)
@@ -229,24 +260,32 @@ def main() -> int:
         print(f"拉取财报日历失败: {exc}")
         return 1
 
-    matched: list[EarningsEvent] = []
+    matched: list[tuple[int, EarningsEvent]] = []
     for row in rows:
         event = _normalize_event(row)
         if not event:
             continue
-        if event.symbol in watchlist:
-            matched.append(event)
+        if event.symbol not in watchlist:
+            continue
+        event_bj_date = datetime.strptime(event.report_date_bj, "%Y-%m-%d").date()
+        days_until = (event_bj_date - today_bj).days
+        if days_until in reminder_offsets:
+            matched.append((days_until, event))
 
     if not matched:
         print("本次无白名单股票财报事件, 不推送")
         return 0
 
-    matched.sort(key=lambda x: (x.report_date_bj, x.symbol))
+    matched.sort(key=lambda x: (x[0], x[1].report_date_bj, x[1].symbol))
     message = _build_message(matched)
     print(message)
 
     try:
-        _push_webhook(webhook_url=webhook_url, events=matched, message=message)
+        _push_webhook(
+            webhook_url=webhook_url,
+            events=[item[1] for item in matched],
+            message=message,
+        )
     except urllib.error.HTTPError as exc:
         print(f"Webhook 推送失败, HTTPError: {exc.code} {exc.reason}")
         return 1

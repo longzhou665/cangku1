@@ -25,6 +25,7 @@
 
 ### Variables（可选）
 
+- `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
 - `LOOKBACK_DAYS`：向前回看天数，默认 `0`
 
