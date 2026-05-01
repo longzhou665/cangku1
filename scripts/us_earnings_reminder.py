@@ -262,7 +262,9 @@ def main() -> int:
         return 0
 
     now_et_dt = datetime.now(ET_TZ)
-    if premarket_only and now_et_dt.hour != 4:
+    event_name = os.getenv("GITHUB_EVENT_NAME", "").strip()
+    is_manual_dispatch = event_name == "workflow_dispatch"
+    if premarket_only and not is_manual_dispatch and now_et_dt.hour != 4:
         print(
             f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前开始时刻(04点), 跳过执行"
         )
