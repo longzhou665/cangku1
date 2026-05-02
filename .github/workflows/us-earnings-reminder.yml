@@ -2,10 +2,9 @@ name: US Earnings Reminder
 # refresh
 on:
   schedule:
-    # 04:00 ET premarket open.
-    # EDT: 08:00 UTC, EST: 09:00 UTC
-    - cron: "0 8 * * 1-5"
-    - cron: "0 9 * * 1-5"
+    # Align to 04:00 ET premarket open.
+    # The script selects the correct UTC hour based on whether America/New_York is in DST.
+    - cron: "0 8,9 * * 1-5"
   workflow_dispatch:
 
 jobs:

@@ -268,25 +268,28 @@ def main() -> int:
     is_scheduled = event_name == "schedule"
 
     if premarket_only and not is_manual_dispatch:
-        # GitHub Actions cron runs in UTC. We schedule two UTC hours to cover DST:
-        # - EDT: 08:00 UTC == 04:00 ET
-        # - EST: 09:00 UTC == 04:00 ET
-        #
-        # The "other" UTC hour corresponds to 05:00 ET during the opposite offset,
-        # so scheduled runs at that hour should intentionally no-op.
         if is_scheduled:
             utc_hour = now_utc_dt.astimezone(timezone.utc).hour
             et_hour = now_et_dt.hour
-            if utc_hour == 8 and et_hour == 4:
-                pass
-            elif utc_hour == 9 and et_hour == 4:
-                pass
-            else:
+            et_offset = now_et_dt.utcoffset() or timedelta(0)
+            is_dst = et_offset != timedelta(hours=-5)
+
+            # Pick the UTC hour that maps to 04:00 ET for today's offset rules.
+            expected_utc_hour = 8 if is_dst else 9
+
+            if utc_hour != expected_utc_hour:
                 print(
-                    "定时触发但不在目标盘前窗口: "
-                    f"UTC {now_utc_dt.strftime('%Y-%m-%d %H:%M:%S')} | "
-                    f"ET {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')} | "
-                    f"github_event={event_name or 'unknown'}"
+                    "定时触发但 UTC 小时不匹配当前美东偏移: "
+                    f"UTC {now_utc_dt.strftime('%Y-%m-%d %H:%M')} (hour={utc_hour}) | "
+                    f"ET {now_et_dt.strftime('%Y-%m-%d %H:%M')} (hour={et_hour}, dst={is_dst}) | "
+                    f"expected_utc_hour={expected_utc_hour} | github_event={event_name or 'unknown'}"
+                )
+                return 0
+
+            # GitHub schedule delays are usually within the same hour; allow the full 04:xx ET window.
+            if et_hour != 4:
+                print(
+                    f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前窗口(04:00-04:59 ET), 跳过执行"
                 )
                 return 0
         elif now_et_dt.hour != 4:
