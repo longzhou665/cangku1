@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, timezone
 from zoneinfo import ZoneInfo
 
 
@@ -262,13 +262,38 @@ def main() -> int:
         return 0
 
     now_et_dt = datetime.now(ET_TZ)
+    now_utc_dt = datetime.now(timezone.utc)
     event_name = os.getenv("GITHUB_EVENT_NAME", "").strip()
     is_manual_dispatch = event_name == "workflow_dispatch"
-    if premarket_only and not is_manual_dispatch and now_et_dt.hour != 4:
-        print(
-            f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前开始时刻(04点), 跳过执行"
-        )
-        return 0
+    is_scheduled = event_name == "schedule"
+
+    if premarket_only and not is_manual_dispatch:
+        # GitHub Actions cron runs in UTC. We schedule two UTC hours to cover DST:
+        # - EDT: 08:00 UTC == 04:00 ET
+        # - EST: 09:00 UTC == 04:00 ET
+        #
+        # The "other" UTC hour corresponds to 05:00 ET during the opposite offset,
+        # so scheduled runs at that hour should intentionally no-op.
+        if is_scheduled:
+            utc_hour = now_utc_dt.astimezone(timezone.utc).hour
+            et_hour = now_et_dt.hour
+            if utc_hour == 8 and et_hour == 4:
+                pass
+            elif utc_hour == 9 and et_hour == 4:
+                pass
+            else:
+                print(
+                    "定时触发但不在目标盘前窗口: "
+                    f"UTC {now_utc_dt.strftime('%Y-%m-%d %H:%M:%S')} | "
+                    f"ET {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')} | "
+                    f"github_event={event_name or 'unknown'}"
+                )
+                return 0
+        elif now_et_dt.hour != 4:
+            print(
+                f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前窗口(04:00-04:59 ET), 跳过执行"
+            )
+            return 0
 
     now_et = datetime.now(ET_TZ).date()
     today_bj = datetime.now(BJ_TZ).date()
