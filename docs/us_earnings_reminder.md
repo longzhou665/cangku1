@@ -8,7 +8,7 @@
 - 标注盘前/盘后/盘中
 - 通过 Webhook 推送提醒
 - 支持 GitHub `schedule` 抖动：同一美东盘前窗口内多次触发，但会对已推送事件去重
-- 支持“每日 webhook 兜底”：若当天没有需要提醒的事件，也会发送一次健康检查消息，确保 webhook 至少成功一次（可关闭）
+- 无推送时仅在 Actions 日志输出原因，不向 webhook 发送健康检查消息（避免打扰）
 
 ## 新增文件
 
@@ -29,7 +29,6 @@
 
 - `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
 - `PREMARKET_ONLY`：是否仅在美东盘前开始（04:00 ET）执行，默认 `true`
-- `DAILY_WEBHOOK_FALLBACK`：是否启用每日 webhook 兜底（无命中事件也去 webhook），默认 `true`
 - `DEDUPE_WEBHOOKS`：是否启用推送去重（避免同一事件在同一天重复推送），默认 `true`
 - `SENT_STATE_FILE`：去重状态文件路径（可选，默认 `.cache/earnings_sent_state.json`）
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`

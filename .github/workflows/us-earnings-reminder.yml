@@ -38,7 +38,6 @@ jobs:
           EARNINGS_WHITELIST: ${{ secrets.EARNINGS_WHITELIST }}
           REMINDER_OFFSETS: ${{ vars.REMINDER_OFFSETS || '0,1,7' }}
           PREMARKET_ONLY: ${{ vars.PREMARKET_ONLY || 'true' }}
-          DAILY_WEBHOOK_FALLBACK: ${{ vars.DAILY_WEBHOOK_FALLBACK || 'true' }}
           DEDUPE_WEBHOOKS: ${{ vars.DEDUPE_WEBHOOKS || 'true' }}
           LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '1' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '0' }}
