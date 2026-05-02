@@ -5,6 +5,10 @@ on:
     # Align to 04:00 ET premarket open.
     # The script selects the correct UTC hour based on whether America/New_York is in DST.
     - cron: "0 8,9 * * 1-5"
+    # Extra UTC windows to tolerate GitHub schedule jitter while still targeting the ET premarket hour.
+    - cron: "15 8,9 * * 1-5"
+    - cron: "30 8,9 * * 1-5"
+    - cron: "45 8,9 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -15,6 +19,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Restore sent-state cache
+        uses: actions/cache@v5
+        with:
+          path: .cache
+          key: earnings-sent-state-${{ github.repository }}
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -28,6 +38,8 @@ jobs:
           EARNINGS_WHITELIST: ${{ secrets.EARNINGS_WHITELIST }}
           REMINDER_OFFSETS: ${{ vars.REMINDER_OFFSETS || '0,1,7' }}
           PREMARKET_ONLY: ${{ vars.PREMARKET_ONLY || 'true' }}
+          DAILY_WEBHOOK_FALLBACK: ${{ vars.DAILY_WEBHOOK_FALLBACK || 'true' }}
+          DEDUPE_WEBHOOKS: ${{ vars.DEDUPE_WEBHOOKS || 'true' }}
           LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '1' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '0' }}
         run: python scripts/us_earnings_reminder.py

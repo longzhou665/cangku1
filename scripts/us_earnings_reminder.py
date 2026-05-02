@@ -73,6 +73,40 @@ def _optional_bool(name: str, default: bool) -> bool:
     raise ValueError(f"环境变量 {name} 需要是布尔值, 当前值: {raw}")
 
 
+def _state_file_path() -> str:
+    raw = os.getenv("SENT_STATE_FILE", "").strip()
+    if raw:
+        return raw
+    return os.path.join(".cache", "earnings_sent_state.json")
+
+
+def _load_sent_state(path: str) -> dict:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict):
+            return data
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _save_sent_state(path: str, state: dict) -> None:
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, ensure_ascii=False, indent=2, sort_keys=True)
+    os.replace(tmp_path, path)
+
+
+def _event_key(event: EarningsEvent, days_until: int) -> str:
+    return f"{event.symbol}|bj={event.report_date_bj}|et={event.report_date_et}|session={event.session_cn}|d={days_until}"
+
+
 def _parse_watchlist(raw: str) -> set[str]:
     return {x.strip().upper() for x in raw.split(",") if x.strip()}
 
@@ -198,11 +232,17 @@ def _read_http_error_body(exc: urllib.error.HTTPError) -> str:
     return raw.decode("utf-8", errors="ignore")
 
 
-def _push_webhook(webhook_url: str, events: list[EarningsEvent], message: str) -> None:
+def _push_webhook(
+    webhook_url: str,
+    events: list[EarningsEvent],
+    message: str,
+    *,
+    username: str = "财报提醒",
+) -> None:
     # Whop feed webhook commonly accepts `content` (and optional `username`).
     # Keep backward-compatible payloads as fallback for other webhook providers.
     candidate_payloads = [
-        {"content": message, "username": "财报提醒"},
+        {"content": message, "username": username},
         {"content": message},
         {
             "text": message,
@@ -252,6 +292,8 @@ def main() -> int:
         lookahead_days = _optional_int("LOOKAHEAD_DAYS", 1)
         lookback_days = _optional_int("LOOKBACK_DAYS", 0)
         premarket_only = _optional_bool("PREMARKET_ONLY", True)
+        daily_webhook_fallback = _optional_bool("DAILY_WEBHOOK_FALLBACK", True)
+        dedupe_webhooks = _optional_bool("DEDUPE_WEBHOOKS", True)
     except ValueError as exc:
         print(str(exc))
         return 2
@@ -336,7 +378,48 @@ def main() -> int:
             matched.append((days_until, event))
 
     if not matched:
-        print("本次无白名单股票财报事件, 不推送")
+        print("本次无白名单股票财报事件")
+        if (
+            daily_webhook_fallback
+            and is_scheduled
+            and premarket_only
+            and not is_manual_dispatch
+        ):
+            state_path = _state_file_path()
+            state = _load_sent_state(state_path)
+            et_day = now_et_dt.strftime("%Y-%m-%d")
+            hb_key = f"heartbeat|et_day={et_day}"
+            if dedupe_webhooks and hb_key in state.get("sent", {}):
+                print("今日已发送过健康检查 webhook, 跳过重复发送")
+                return 0
+
+            today_bj_text = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
+            hb_message = (
+                f"【美股财报提醒·健康检查】北京时间 {today_bj_text}\n"
+                f"本次未发现需要提醒的白名单财报事件(偏移={reminder_offsets})"
+            )
+            try:
+                _push_webhook(
+                    webhook_url=webhook_url,
+                    events=[],
+                    message=hb_message,
+                    username="财报提醒·健康检查",
+                )
+            except urllib.error.HTTPError as exc:
+                print(f"健康检查 Webhook 推送失败, HTTPError: {exc.code} {exc.reason}")
+                return 1
+            except urllib.error.URLError as exc:
+                print(f"健康检查 Webhook 推送失败, URLError: {exc.reason}")
+                return 1
+            except Exception as exc:
+                print(f"健康检查 Webhook 推送失败: {exc}")
+                return 1
+
+            if dedupe_webhooks:
+                state.setdefault("sent", {})[hb_key] = {
+                    "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+                _save_sent_state(state_path, state)
         return 0
 
     # 二次白名单过滤（发送前双保险）
@@ -350,13 +433,74 @@ def main() -> int:
         return 0
 
     matched.sort(key=lambda x: (x[0], x[1].report_date_bj, x[1].symbol))
-    message = _build_message(matched)
+
+    state_path = _state_file_path()
+    state = _load_sent_state(state_path) if dedupe_webhooks else {}
+    sent_map = state.get("sent", {}) if isinstance(state, dict) else {}
+
+    pending: list[tuple[int, EarningsEvent]] = []
+    if dedupe_webhooks:
+        for days_until, event in matched:
+            key = _event_key(event, days_until)
+            if key in sent_map:
+                print(f"跳过重复推送: {key}")
+                continue
+            pending.append((days_until, event))
+    else:
+        pending = matched
+
+    if not pending:
+        print("本次命中事件均已推送过, 无需重复推送")
+        if (
+            daily_webhook_fallback
+            and is_scheduled
+            and premarket_only
+            and not is_manual_dispatch
+        ):
+            state_path = _state_file_path()
+            state = _load_sent_state(state_path)
+            et_day = now_et_dt.strftime("%Y-%m-%d")
+            hb_key = f"heartbeat|et_day={et_day}|deduped"
+            if dedupe_webhooks and hb_key in state.get("sent", {}):
+                print("今日已发送过去重健康检查 webhook, 跳过重复发送")
+                return 0
+
+            today_bj_text = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
+            hb_message = (
+                f"【美股财报提醒·健康检查】北京时间 {today_bj_text}\n"
+                f"本次命中事件均已推送过(偏移={reminder_offsets}), webhook 连通性正常"
+            )
+            try:
+                _push_webhook(
+                    webhook_url=webhook_url,
+                    events=[],
+                    message=hb_message,
+                    username="财报提醒·健康检查",
+                )
+            except urllib.error.HTTPError as exc:
+                print(f"健康检查 Webhook 推送失败, HTTPError: {exc.code} {exc.reason}")
+                return 1
+            except urllib.error.URLError as exc:
+                print(f"健康检查 Webhook 推送失败, URLError: {exc.reason}")
+                return 1
+            except Exception as exc:
+                print(f"健康检查 Webhook 推送失败: {exc}")
+                return 1
+
+            if dedupe_webhooks:
+                state.setdefault("sent", {})[hb_key] = {
+                    "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+                _save_sent_state(state_path, state)
+        return 0
+
+    message = _build_message(pending)
     print(message)
 
     try:
         _push_webhook(
             webhook_url=webhook_url,
-            events=[item[1] for item in matched],
+            events=[item[1] for item in pending],
             message=message,
         )
     except urllib.error.HTTPError as exc:
@@ -368,6 +512,15 @@ def main() -> int:
     except Exception as exc:
         print(f"Webhook 推送失败: {exc}")
         return 1
+
+    if dedupe_webhooks:
+        for days_until, event in pending:
+            key = _event_key(event, days_until)
+            sent_map[key] = {
+                "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        state["sent"] = sent_map
+        _save_sent_state(state_path, state)
     return 0
 
 
