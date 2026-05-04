@@ -146,32 +146,33 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
 def _hour_to_session(hour: str) -> tuple[str, time | None]:
     """解析 Finnhub `hour` 字段。
 
-    - 有 `bmo`/`amc`/`dmh`：保留盘前/盘后/盘中文案（不编造具体 HH:mm，time 恒为 None）。
-    - `hour` 为空：API 未标注时段，仅按财报日展示日期，不把 session 猜成盘前。
+    - `bmo`/`amc`/`dmh`：用 Finnhub 惯例锚点换算为北京时间后展示「日期 + 时分 + 前/后/左右」
+      （bmo=美东 09:30，amc=美东 16:00，dmh=美东 12:00；盘后常跨到北京次日清晨）。
+    - `hour` 为空：不猜盘前/盘后，仅用美东财报日 0:00 锚出北京历日期（无时分、无前/后）。
     """
     normalized = (hour or "").strip().lower()
     if not normalized:
         return "", None
     if normalized == "bmo":
-        return "盘前", None
+        return "盘前", time(9, 30)
     if normalized == "amc":
-        return "盘后", None
+        return "盘后", time(16, 0)
     if normalized == "dmh":
-        return "盘中", None
+        return "盘中", time(12, 0)
     return "未知", None
 
 
 def _build_bj_time_hint(session_cn: str, dt_bj: datetime) -> str:
-    dt_text = dt_bj.strftime("%Y-%m-%d")
     if not (session_cn or "").strip():
-        return dt_text
+        return dt_bj.strftime("%Y-%m-%d")
+    dt_clock = dt_bj.strftime("%Y-%m-%d %H:%M")
     if session_cn == "盘前":
-        return f"{dt_text}前"
+        return f"{dt_clock}前"
     if session_cn == "盘后":
-        return f"{dt_text}后"
+        return f"{dt_clock}后"
     if session_cn == "盘中":
-        return f"{dt_text}左右"
-    return dt_text
+        return f"{dt_clock}左右"
+    return dt_bj.strftime("%Y-%m-%d")
 
 
 def _fmt_number(value: object) -> str:
@@ -235,26 +236,14 @@ def _build_message(events: list[EarningsEvent]) -> str:
     today_bj = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
     for _, item in events:
-        parts = [item.report_date_bj]
-        et_t = (item.event_time_bj or "").strip()
-        if et_t:
-            parts.append(et_t)
-        bj_time_label = " ".join(parts)
-        # 文案后缀以锚点北京时间为准，避免 session 字段异常时丢“前/后”
-        hint = (item.bj_time_hint or "").strip()
-        if hint.endswith("前"):
-            bj_time_label += "前"
-        elif hint.endswith("后"):
-            bj_time_label += "后"
-        elif hint.endswith("左右"):
-            bj_time_label += "左右"
-        else:
-            if item.session_cn == "盘后":
-                bj_time_label += "后"
-            elif item.session_cn == "盘前":
-                bj_time_label += "前"
-            elif item.session_cn == "盘中":
-                bj_time_label += "左右"
+        # `bj_time_hint` 已含完整展示：如 `2026-05-11 21:30前`、纯日期、或 `2026-05-12 04:00后`
+        bj_time_label = (item.bj_time_hint or "").strip()
+        if not bj_time_label:
+            parts = [item.report_date_bj]
+            et_t = (item.event_time_bj or "").strip()
+            if et_t:
+                parts.append(et_t)
+            bj_time_label = " ".join(parts)
         lines.append(
             f"- {item.symbol} | 北京时间: {bj_time_label}"
         )
