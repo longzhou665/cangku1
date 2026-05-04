@@ -47,6 +47,10 @@
 - 工作流使用 `actions/cache` 持久化 `.cache/earnings_sent_state.json`
 - 同一天同一事件只会推送一次（除非关闭 `DEDUPE_WEBHOOKS`）
 
+## 说明
+
+- Finnhub 返回的 `hour` 可能为 JSON `null`（Python `None`）。脚本会按「未提供时段」处理；若接口实际给出了 `bmo`/`amc`/`dmh`，会正常拼接北京时间与前/后。
+
 ## 推送内容
 
 推送包含以下信息：

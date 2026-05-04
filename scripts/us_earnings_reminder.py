@@ -143,6 +143,16 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
     return rows
 
 
+def _normalize_finnhub_hour(raw: object) -> str:
+    """Finnhub JSON 里 `hour` 常为 null；`dict.get('hour','')` 在键存在且值为 null 时仍得到 None。"""
+    if raw is None:
+        return ""
+    token = str(raw).strip().lower()
+    if token in {"", "null", "none", "n/a", "na", "-"}:
+        return ""
+    return token
+
+
 def _hour_to_session(hour: str) -> tuple[str, time | None]:
     """解析 Finnhub `hour` 字段。
 
@@ -206,7 +216,7 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
     if not symbol or not report_date_et:
         return None
 
-    hour = str(row.get("hour", "")).strip().lower()
+    hour = _normalize_finnhub_hour(row.get("hour"))
     session_cn, event_time_et = _hour_to_session(hour)
 
     et_date = datetime.strptime(report_date_et, "%Y-%m-%d").date()
