@@ -2,7 +2,7 @@
 
 ## 功能说明
 
-- 定时从 Finnhub 财报日历拉取数据
+- 定时从财报日历拉取数据：**默认 Finnhub**；可选 **Financial Modeling Prep (FMP)**（`stable/earnings-calendar`，通常带 `time`/`when`，盘前/盘后更完整）
 - 只筛选白名单中的美股代码
 - 自动换算为北京时间日期
 - 标注盘前/盘后/盘中：`bmo`/`amc`/`dmh` 分别按美东 **09:30 / 16:00 / 12:00** 锚点换算为北京时间，推送形如 `2026-05-11 21:30前`、`2026-05-12 04:00后`（盘后常跨北京历日）；`hour` 为空时仅用美东财报日 0:00 锚出 **北京历日期**（无时分、无前/后）
@@ -21,12 +21,14 @@
 
 ### Secrets
 
-- `FINNHUB_API_TOKEN`：Finnhub API Token
+- `FINNHUB_API_TOKEN`：Finnhub API Token（`EARNINGS_DATA_SOURCE=finnhub` 或未设置时必填）
+- `FMP_API_KEY`：Financial Modeling Prep API Key（仅当 Variables 里 `EARNINGS_DATA_SOURCE=fmp` 时必填；在 [FMP 注册](https://site.financialmodelingprep.com/register) 获取）
 - `WEBHOOK_URL`：你的 webhook 地址
 - `EARNINGS_WHITELIST`：股票白名单，逗号分隔，例如 `AAPL,MSFT,NVDA,TSLA`
 
 ### Variables（可选）
 
+- `EARNINGS_DATA_SOURCE`：`finnhub`（默认）或 `fmp`。选 `fmp` 时用 `FMP_API_KEY` 拉取 `https://financialmodelingprep.com/stable/earnings-calendar`
 - `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
 - `PREMARKET_ONLY`：是否启用“盘前模式”的门控，默认 `true`
   - 对 GitHub `schedule`：仅限制“美股工作日”，不在脚本里用固定 UTC 小时拒绝执行（避免 schedule 延迟导致整天不跑）
@@ -36,8 +38,8 @@
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
 - `LOOKBACK_DAYS`：向前回看天数，默认 `0`
 - `SKIP_WEBHOOK`：设为 `1`/`true` 时只打印待推送正文并**不**调用 webhook（本地核对解析用）
-- `EARNINGS_CALENDAR_FIXTURE`：指向本地 JSON 文件（含 `earningsCalendar` 数组）时**不请求 Finnhub**，用于离线验证；可不设 `FINNHUB_API_TOKEN`
-- `EARNINGS_HOUR_DEFAULTS`：Finnhub `calendar/earnings` 对不少标的 `hour` 长期为空字符串时，用其补 `bmo`/`amc`/`dmh`（仅当接口 `hour` 为空时生效）。示例：`CRCL:bmo,ASTS:amc,HIMS:bmo,SBET:amc`（未列出的标的仍只显示日期）
+- `EARNINGS_CALENDAR_FIXTURE`：指向本地 JSON 文件（含 `earningsCalendar` 数组）时**不请求远程日历**，用于离线验证；可不设 `FINNHUB_API_TOKEN` / `FMP_API_KEY`
+- `EARNINGS_HOUR_DEFAULTS`：当所选数据源仍把时段留空时，按标的补 `bmo`/`amc`/`dmh`（仅当接口 `hour` 为空时生效）。示例：`CRCL:bmo,ASTS:amc`（未列出的标的仍只显示日期）
 
 ## 运行方式
 

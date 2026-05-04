@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 
 FINNHUB_API = "https://finnhub.io/api/v1/calendar/earnings"
+FMP_EARNINGS_CALENDAR = "https://financialmodelingprep.com/stable/earnings-calendar"
 ET_TZ = ZoneInfo("America/New_York")
 BJ_TZ = ZoneInfo("Asia/Shanghai")
 
@@ -164,6 +165,63 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
     if not isinstance(rows, list):
         raise RuntimeError("Finnhub 返回数据格式异常: earningsCalendar 非数组")
     return rows
+
+
+def _fmp_time_to_hour_code(time_val: object, when_val: object) -> str:
+    """FMP 日历常见 `time` 为 bmo/amc；部分行用英文 `when` 描述。"""
+    t = _normalize_finnhub_hour(time_val)
+    if t in ("bmo", "amc", "dmh"):
+        return t
+    raw = str(time_val or "").strip().lower()
+    if raw in ("beforemarketopen", "before_market_open", "before open", "premarket"):
+        return "bmo"
+    if raw in ("aftermarketclose", "after_market_close", "after close", "postmarket"):
+        return "amc"
+    w = str(when_val or "").strip().lower()
+    if not w:
+        return ""
+    if "before" in w and "open" in w:
+        return "bmo"
+    if "after" in w and "close" in w:
+        return "amc"
+    if "during" in w and "hour" in w:
+        return "dmh"
+    return ""
+
+
+def _fmp_row_to_finnhub_shape(row: dict) -> dict:
+    """将 FMP 行转为与 Finnhub `earningsCalendar` 元素同构，复用 `_normalize_event`。"""
+    date_raw = row.get("date") or row.get("earningsDate") or ""
+    date_s = str(date_raw)[:10]
+    eps_est = row.get("epsEstimated")
+    if eps_est is None:
+        eps_est = row.get("epsEstimate") or row.get("eps_estimated")
+    rev_est = row.get("revenueEstimated")
+    if rev_est is None:
+        rev_est = row.get("revenueEstimate") or row.get("revenue_estimated")
+    return {
+        "symbol": row.get("symbol", ""),
+        "date": date_s,
+        "hour": _fmp_time_to_hour_code(row.get("time"), row.get("when")),
+        "epsEstimate": eps_est,
+        "revenueEstimate": rev_est,
+    }
+
+
+def _fetch_earnings_fmp(api_key: str, from_date: str, to_date: str) -> list[dict]:
+    query = urllib.parse.urlencode(
+        {"from": from_date, "to": to_date, "apikey": api_key}
+    )
+    url = f"{FMP_EARNINGS_CALENDAR}?{query}"
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=45) as resp:
+        body = resp.read().decode("utf-8")
+    data = json.loads(body)
+    if isinstance(data, dict) and data.get("Error Message"):
+        raise RuntimeError(str(data.get("Error Message")))
+    if not isinstance(data, list):
+        raise RuntimeError("FMP 返回数据格式异常: 期望 JSON 数组")
+    return [_fmp_row_to_finnhub_shape(r) for r in data if isinstance(r, dict)]
 
 
 def _normalize_finnhub_hour(raw: object) -> str:
@@ -353,12 +411,20 @@ def _push_webhook(
 
 def main() -> int:
     calendar_fixture = os.getenv("EARNINGS_CALENDAR_FIXTURE", "").strip()
+    data_source = os.getenv("EARNINGS_DATA_SOURCE", "finnhub").strip().lower()
+    finnhub_token = ""
+    fmp_api_key = ""
     try:
-        token = (
-            _require_env("FINNHUB_API_TOKEN")
-            if not calendar_fixture
-            else os.getenv("FINNHUB_API_TOKEN", "").strip()
-        )
+        if not calendar_fixture:
+            if data_source == "fmp":
+                fmp_api_key = _require_env("FMP_API_KEY")
+            elif data_source == "finnhub":
+                finnhub_token = _require_env("FINNHUB_API_TOKEN")
+            else:
+                raise ValueError(
+                    "EARNINGS_DATA_SOURCE 必须是 finnhub 或 fmp"
+                    f", 当前: {data_source!r}"
+                )
         webhook_url = _require_env("WEBHOOK_URL")
         watchlist_raw = _require_env("EARNINGS_WHITELIST")
         reminder_offsets = _optional_offsets("REMINDER_OFFSETS", (0, 1, 7))
@@ -408,9 +474,11 @@ def main() -> int:
     print(f"查询区间(美东): {from_date} -> {to_date}")
     print(f"白名单股票: {', '.join(sorted(watchlist))}")
     print(f"提醒偏移天数(北京时间): {reminder_offsets}")
+    if not calendar_fixture:
+        print(f"数据源: {data_source}")
 
     if calendar_fixture:
-        print(f"使用本地日历 fixture(不请求 Finnhub): {calendar_fixture}")
+        print(f"使用本地日历 fixture(不请求远程日历): {calendar_fixture}")
         try:
             with open(calendar_fixture, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -426,7 +494,14 @@ def main() -> int:
             return 1
     else:
         try:
-            rows = _fetch_earnings(token, from_date=from_date, to_date=to_date)
+            if data_source == "fmp":
+                rows = _fetch_earnings_fmp(
+                    fmp_api_key, from_date=from_date, to_date=to_date
+                )
+            else:
+                rows = _fetch_earnings(
+                    finnhub_token, from_date=from_date, to_date=to_date
+                )
         except urllib.error.HTTPError as exc:
             print(f"拉取财报日历失败, HTTPError: {exc.code} {exc.reason}")
             detail = _read_http_error_body(exc)
