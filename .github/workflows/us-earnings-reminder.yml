@@ -2,10 +2,10 @@ name: US Earnings Reminder
 # refresh
 on:
   schedule:
-    # Align to 04:00 ET premarket open.
-    # The script selects the correct UTC hour based on whether America/New_York is in DST.
+    # Target ~premarket in America/New_York via multiple UTC hours + minute offsets.
+    # The script does NOT hard-reject runs based on "expected UTC hour" (GitHub schedule can be delayed).
     - cron: "0 8,9 * * 1-5"
-    # Extra UTC windows to tolerate GitHub schedule jitter while still targeting the ET premarket hour.
+    # Extra minute buckets to reduce "missed window" risk when dispatch is delayed within the hour.
     - cron: "15 8,9 * * 1-5"
     - cron: "30 8,9 * * 1-5"
     - cron: "45 8,9 * * 1-5"

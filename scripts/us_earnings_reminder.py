@@ -103,6 +103,21 @@ def _save_sent_state(path: str, state: dict) -> None:
     os.replace(tmp_path, path)
 
 
+def _schedule_day_success_key(et_day: str) -> str:
+    return f"premarket_day_success|et_day={et_day}"
+
+
+def _mark_schedule_day_success(state_path: str, et_day: str | None = None) -> None:
+    state = _load_sent_state(state_path)
+    sent_map = state.get("sent", {}) if isinstance(state, dict) else {}
+    day = et_day or datetime.now(ET_TZ).strftime("%Y-%m-%d")
+    sent_map[_schedule_day_success_key(day)] = {
+        "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    state["sent"] = sent_map
+    _save_sent_state(state_path, state)
+
+
 def _event_key(event: EarningsEvent, days_until: int) -> str:
     return f"{event.symbol}|bj={event.report_date_bj}|et={event.report_date_et}|session={event.session_cn}|d={days_until}"
 
@@ -315,36 +330,23 @@ def main() -> int:
         return 0
 
     now_et_dt = datetime.now(ET_TZ)
-    now_utc_dt = datetime.now(timezone.utc)
     event_name = os.getenv("GITHUB_EVENT_NAME", "").strip()
     is_manual_dispatch = event_name == "workflow_dispatch"
     is_scheduled = event_name == "schedule"
 
     if premarket_only and not is_manual_dispatch:
         if is_scheduled:
-            utc_hour = now_utc_dt.astimezone(timezone.utc).hour
-            et_hour = now_et_dt.hour
-            et_offset = now_et_dt.utcoffset() or timedelta(0)
-            is_dst = et_offset != timedelta(hours=-5)
+            et_weekday = now_et_dt.weekday()  # Mon=0 ... Sun=6
 
-            # Pick the UTC hour that maps to 04:00 ET for today's offset rules.
-            expected_utc_hour = 8 if is_dst else 9
-
-            if utc_hour != expected_utc_hour:
+            # 只在美股工作日尝试执行（避免周末无意义跑）
+            if et_weekday >= 5:
                 print(
-                    "定时触发但 UTC 小时不匹配当前美东偏移: "
-                    f"UTC {now_utc_dt.strftime('%Y-%m-%d %H:%M')} (hour={utc_hour}) | "
-                    f"ET {now_et_dt.strftime('%Y-%m-%d %H:%M')} (hour={et_hour}, dst={is_dst}) | "
-                    f"expected_utc_hour={expected_utc_hour} | github_event={event_name or 'unknown'}"
+                    f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')} 为周末, 跳过执行 | github_event={event_name}"
                 )
                 return 0
 
-            # GitHub schedule delays are usually within the same hour; allow the full 04:xx ET window.
-            if et_hour != 4:
-                print(
-                    f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前窗口(04:00-04:59 ET), 跳过执行"
-                )
-                return 0
+            # GitHub `schedule` 派发时间可能大幅抖动/跨小时；不要用“固定 UTC 小时”去卡死执行。
+            # 同一美东交易日最多成功执行一次：由 `premarket_day_success|et_day=...` 控制（见成功路径写入）。
         elif now_et_dt.hour != 4:
             print(
                 f"当前美东时间 {now_et_dt.strftime('%Y-%m-%d %H:%M:%S')}, 非盘前窗口(04:00-04:59 ET), 跳过执行"
@@ -376,6 +378,18 @@ def main() -> int:
         print(f"拉取财报日历失败: {exc}")
         return 1
 
+    state_path = _state_file_path()
+    et_day_run = now_et_dt.strftime("%Y-%m-%d")
+    if premarket_only and is_scheduled and not is_manual_dispatch:
+        state = _load_sent_state(state_path)
+        sent_map = state.get("sent", {}) if isinstance(state, dict) else {}
+        day_success_key = _schedule_day_success_key(et_day_run)
+        if day_success_key in sent_map:
+            print(
+                f"本交易日盘前已成功执行过一次, 跳过重复运行 | key={day_success_key} | github_event={event_name}"
+            )
+            return 0
+
     matched: list[tuple[int, EarningsEvent]] = []
     for row in rows:
         event = _normalize_event(row)
@@ -393,6 +407,8 @@ def main() -> int:
             "未推送原因: 在查询区间内未找到满足提醒偏移的白名单财报事件"
             f" (偏移={reminder_offsets}, 查询区间(美东)={from_date}->{to_date})"
         )
+        if premarket_only and is_scheduled and not is_manual_dispatch:
+            _mark_schedule_day_success(state_path, et_day_run)
         return 0
 
     # 二次白名单过滤（发送前双保险）
@@ -403,11 +419,12 @@ def main() -> int:
         print(f"二次白名单过滤已丢弃 {dropped} 条非白名单事件")
     if not matched:
         print("二次白名单过滤后无可推送事件")
+        if premarket_only and is_scheduled and not is_manual_dispatch:
+            _mark_schedule_day_success(state_path, et_day_run)
         return 0
 
     matched.sort(key=lambda x: (x[0], x[1].report_date_bj, x[1].symbol))
 
-    state_path = _state_file_path()
     state = _load_sent_state(state_path) if dedupe_webhooks else {}
     sent_map = state.get("sent", {}) if isinstance(state, dict) else {}
 
@@ -426,6 +443,8 @@ def main() -> int:
         print(
             "未推送原因: 本次命中事件均已推送过(去重命中), 为避免重复打扰已跳过 webhook 推送"
         )
+        if premarket_only and is_scheduled and not is_manual_dispatch:
+            _mark_schedule_day_success(state_path, et_day_run)
         return 0
 
     message = _build_message(pending)
@@ -455,6 +474,8 @@ def main() -> int:
             }
         state["sent"] = sent_map
         _save_sent_state(state_path, state)
+    if premarket_only and is_scheduled and not is_manual_dispatch:
+        _mark_schedule_day_success(state_path, et_day_run)
     return 0
 
 

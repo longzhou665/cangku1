@@ -7,7 +7,7 @@
 - 自动换算为北京时间日期
 - 标注盘前/盘后/盘中
 - 通过 Webhook 推送提醒
-- 支持 GitHub `schedule` 抖动：同一美东盘前窗口内多次触发，但会对已推送事件去重
+- 支持 GitHub `schedule` 抖动：`schedule` 触发不再用“固定 UTC 小时”卡死执行；同一美东交易日最多成功跑一次，并对已推送事件去重
 - 无推送时仅在 Actions 日志输出原因，不向 webhook 发送健康检查消息（避免打扰）
 
 ## 新增文件
@@ -28,7 +28,9 @@
 ### Variables（可选）
 
 - `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
-- `PREMARKET_ONLY`：是否仅在美东盘前开始（04:00 ET）执行，默认 `true`
+- `PREMARKET_ONLY`：是否启用“盘前模式”的门控，默认 `true`
+  - 对 GitHub `schedule`：仅限制“美股工作日”，不在脚本里用固定 UTC 小时拒绝执行（避免 schedule 延迟导致整天不跑）
+  - 对非 `schedule` 且非 `workflow_dispatch`：仍限制在美东 `04:00-04:59`（保持本地/其它触发方式更克制）
 - `DEDUPE_WEBHOOKS`：是否启用推送去重（避免同一事件在同一天重复推送），默认 `true`
 - `SENT_STATE_FILE`：去重状态文件路径（可选，默认 `.cache/earnings_sent_state.json`）
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
@@ -36,7 +38,8 @@
 
 ## 运行方式
 
-- 自动：工作流在每个工作日于 `08/09 UTC` 的 `:00/:15/:30/:45` 触发，脚本会根据当天美东是否夏令时选择正确的一枪，并在美东 `04:00-04:59` 窗口内执行，可自动适配夏令时/冬令时
+- 自动：工作流在每个工作日于 `08/09 UTC` 的 `:00/:15/:30/:45` 触发（用于贴近美东早盘，并容忍 GitHub schedule 抖动）
+- 脚本侧：`schedule` 触发只要落在美股工作日就会尝试执行；同一美东交易日成功执行后会写入 `premarket_day_success|et_day=...`，避免同一天因多 cron 重复跑
 - 手动：在 GitHub Actions 页面使用 `workflow_dispatch` 触发
 
 ## 去重与状态
