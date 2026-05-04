@@ -36,6 +36,7 @@
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
 - `LOOKBACK_DAYS`：向前回看天数，默认 `0`
 - `SKIP_WEBHOOK`：设为 `1`/`true` 时只打印待推送正文并**不**调用 webhook（本地核对解析用）
+- `EARNINGS_CALENDAR_FIXTURE`：指向本地 JSON 文件（含 `earningsCalendar` 数组）时**不请求 Finnhub**，用于离线验证；可不设 `FINNHUB_API_TOKEN`
 
 ## 运行方式
 
@@ -51,6 +52,7 @@
 ## 说明
 
 - Finnhub 返回的 `hour` 可能为 JSON `null`（Python `None`）。脚本会按「未提供时段」处理；若接口实际给出了 `bmo`/`amc`/`dmh`，会正常拼接北京时间与前/后。
+- 提醒是否命中由 **`REMINDER_OFFSETS` 与「北京历 `report_date_bj`」距今天的天数** 决定。`amc` 锚到北京时间常为**次日清晨**，`report_date_bj` 可能比「美东财报日」晚一天；若希望与「美东同日、仅日期」的股票同一天进提醒，可能需在偏移里包含更大天数（例如同时含 `7` 与 `8`），视具体日期而定。
 
 ## 推送内容
 

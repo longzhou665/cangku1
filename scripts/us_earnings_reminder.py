@@ -324,8 +324,13 @@ def _push_webhook(
 
 
 def main() -> int:
+    calendar_fixture = os.getenv("EARNINGS_CALENDAR_FIXTURE", "").strip()
     try:
-        token = _require_env("FINNHUB_API_TOKEN")
+        token = (
+            _require_env("FINNHUB_API_TOKEN")
+            if not calendar_fixture
+            else os.getenv("FINNHUB_API_TOKEN", "").strip()
+        )
         webhook_url = _require_env("WEBHOOK_URL")
         watchlist_raw = _require_env("EARNINGS_WHITELIST")
         reminder_offsets = _optional_offsets("REMINDER_OFFSETS", (0, 1, 7))
@@ -376,20 +381,36 @@ def main() -> int:
     print(f"白名单股票: {', '.join(sorted(watchlist))}")
     print(f"提醒偏移天数(北京时间): {reminder_offsets}")
 
-    try:
-        rows = _fetch_earnings(token, from_date=from_date, to_date=to_date)
-    except urllib.error.HTTPError as exc:
-        print(f"拉取财报日历失败, HTTPError: {exc.code} {exc.reason}")
-        detail = _read_http_error_body(exc)
-        if detail:
-            print(f"拉取财报日历错误详情: {detail[:1000]}")
-        return 1
-    except urllib.error.URLError as exc:
-        print(f"拉取财报日历失败, URLError: {exc.reason}")
-        return 1
-    except Exception as exc:
-        print(f"拉取财报日历失败: {exc}")
-        return 1
+    if calendar_fixture:
+        print(f"使用本地日历 fixture(不请求 Finnhub): {calendar_fixture}")
+        try:
+            with open(calendar_fixture, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except OSError as exc:
+            print(f"读取 fixture 失败: {exc}")
+            return 1
+        except json.JSONDecodeError as exc:
+            print(f"fixture JSON 无效: {exc}")
+            return 1
+        rows = data.get("earningsCalendar", [])
+        if not isinstance(rows, list):
+            print("fixture 缺少 earningsCalendar 数组")
+            return 1
+    else:
+        try:
+            rows = _fetch_earnings(token, from_date=from_date, to_date=to_date)
+        except urllib.error.HTTPError as exc:
+            print(f"拉取财报日历失败, HTTPError: {exc.code} {exc.reason}")
+            detail = _read_http_error_body(exc)
+            if detail:
+                print(f"拉取财报日历错误详情: {detail[:1000]}")
+            return 1
+        except urllib.error.URLError as exc:
+            print(f"拉取财报日历失败, URLError: {exc.reason}")
+            return 1
+        except Exception as exc:
+            print(f"拉取财报日历失败: {exc}")
+            return 1
 
     state_path = _state_file_path()
     et_day_run = now_et_dt.strftime("%Y-%m-%d")
