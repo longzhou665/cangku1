@@ -210,8 +210,9 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
 
     et_date = datetime.strptime(report_date_et, "%Y-%m-%d").date()
     if event_time_et is None:
-        # 无具体钟点：用美东当日正午换算北京时间日期，减少跨日边界误差
-        dt_et = datetime.combine(et_date, time(12, 0), tzinfo=ET_TZ)
+        # 无具体钟点：用「美东日历日」的 0:00 锚到北京时间日期。
+        # 不能用正午：例如美东 5/11 12:00 对应北京已是 5/12 00:00，会把财报日错推一天。
+        dt_et = datetime.combine(et_date, time(0, 0), tzinfo=ET_TZ)
     else:
         dt_et = datetime.combine(et_date, event_time_et, tzinfo=ET_TZ)
     dt_bj = dt_et.astimezone(BJ_TZ)
