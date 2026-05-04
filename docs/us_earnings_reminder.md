@@ -35,6 +35,7 @@
 - `SENT_STATE_FILE`：去重状态文件路径（可选，默认 `.cache/earnings_sent_state.json`）
 - `LOOKAHEAD_DAYS`：向后查询天数，默认 `1`
 - `LOOKBACK_DAYS`：向前回看天数，默认 `0`
+- `SKIP_WEBHOOK`：设为 `1`/`true` 时只打印待推送正文并**不**调用 webhook（本地核对解析用）
 
 ## 运行方式
 
