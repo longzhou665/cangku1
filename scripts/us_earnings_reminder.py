@@ -144,14 +144,14 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
 
 
 def _hour_to_session(hour: str) -> tuple[str, time | None]:
-    """Finnhub `hour` 通常只有 bmo/amc/dmh 会话标签，没有具体时刻。
+    """解析 Finnhub `hour` 字段。
 
-    不在文案里用 09:30/16:00 等锚点去“拼出”北京时间时分；无具体时刻时返回 None。
+    - 有 `bmo`/`amc`/`dmh`：保留盘前/盘后/盘中文案（不编造具体 HH:mm，time 恒为 None）。
+    - `hour` 为空：API 未标注时段，仅按财报日展示日期，不把 session 猜成盘前。
     """
     normalized = (hour or "").strip().lower()
     if not normalized:
-        # hour 缺失时仍按常见财报习惯归为盘前，但不杜撰具体钟点
-        return "盘前", None
+        return "", None
     if normalized == "bmo":
         return "盘前", None
     if normalized == "amc":
@@ -162,8 +162,9 @@ def _hour_to_session(hour: str) -> tuple[str, time | None]:
 
 
 def _build_bj_time_hint(session_cn: str, dt_bj: datetime) -> str:
-    # 仅展示日期 + 前/后/左右；具体时分以 Finnhub 若未来提供为准（当前不编造）
     dt_text = dt_bj.strftime("%Y-%m-%d")
+    if not (session_cn or "").strip():
+        return dt_text
     if session_cn == "盘前":
         return f"{dt_text}前"
     if session_cn == "盘后":
