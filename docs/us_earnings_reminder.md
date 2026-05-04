@@ -29,6 +29,7 @@
 ### Variables（可选）
 
 - `EARNINGS_DATA_SOURCE`：`finnhub`（默认）或 `fmp`。选 `fmp` 时用 `FMP_API_KEY` 拉取 `https://financialmodelingprep.com/stable/earnings-calendar`
+  - **免费档实测**：该接口常只返回少量全市场条目，**不一定含你的白名单**；且返回 JSON **可能没有** `time`/`when`，盘前/盘后仍会退化成「仅日期」。此时更稳妥是 **Finnhub + `EARNINGS_HOUR_DEFAULTS`**，或升级 FMP 套餐/使用带时段字段的接口。
 - `REMINDER_OFFSETS`：北京时间提醒偏移天数，逗号分隔，默认 `0,1,7`
 - `PREMARKET_ONLY`：是否启用“盘前模式”的门控，默认 `true`
   - 对 GitHub `schedule`：仅限制“美股工作日”，不在脚本里用固定 UTC 小时拒绝执行（避免 schedule 延迟导致整天不跑）

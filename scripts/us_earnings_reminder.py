@@ -515,6 +515,30 @@ def main() -> int:
             print(f"拉取财报日历失败: {exc}")
             return 1
 
+    if not calendar_fixture and data_source == "fmp" and rows:
+        have_syms = {
+            str(r.get("symbol", "")).strip().upper()
+            for r in rows
+            if isinstance(r, dict) and str(r.get("symbol", "")).strip()
+        }
+        missing_syms = sorted(watchlist - have_syms)
+        if missing_syms:
+            print(
+                "提示(FMP): 当前美东日期区间内日历回报未包含以下白名单标的 "
+                f"({len(missing_syms)}): {', '.join(missing_syms)}。"
+                "免费档常只返回截断的全市场子集；未命中则无提醒。"
+            )
+        any_hour = False
+        for r in rows:
+            if isinstance(r, dict) and _normalize_finnhub_hour(r.get("hour")):
+                any_hour = True
+                break
+        if not any_hour:
+            print(
+                "提示(FMP): 本批日历均无 hour/time 字段（免费档常见），"
+                "文案多为仅日期；可配置 EARNINGS_HOUR_DEFAULTS 或改用 Finnhub。"
+            )
+
     state_path = _state_file_path()
     et_day_run = now_et_dt.strftime("%Y-%m-%d")
     if premarket_only and is_scheduled and not is_manual_dispatch:
