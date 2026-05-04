@@ -130,6 +130,9 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
 
 def _hour_to_session(hour: str) -> tuple[str, time]:
     normalized = (hour or "").strip().lower()
+    # Finnhub 有时 hour 为空/缺失，财报日历仍可能给出盘前事件；默认按 BMO 处理更贴近用户预期
+    if not normalized:
+        normalized = "bmo"
     if normalized == "bmo":
         # 按美股正式开盘时刻(09:30 ET)给出盘前提醒时间锚点
         return "盘前", time(9, 30)
@@ -210,12 +213,21 @@ def _build_message(events: list[EarningsEvent]) -> str:
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
     for _, item in events:
         bj_time_label = f"{item.report_date_bj} {item.event_time_bj}"
-        if item.session_cn == "盘后":
-            bj_time_label += "后"
-        elif item.session_cn == "盘前":
+        # 文案后缀以锚点北京时间为准，避免 session 字段异常时丢“前/后”
+        hint = (item.bj_time_hint or "").strip()
+        if hint.endswith("前"):
             bj_time_label += "前"
-        elif item.session_cn == "盘中":
+        elif hint.endswith("后"):
+            bj_time_label += "后"
+        elif hint.endswith("左右"):
             bj_time_label += "左右"
+        else:
+            if item.session_cn == "盘后":
+                bj_time_label += "后"
+            elif item.session_cn == "盘前":
+                bj_time_label += "前"
+            elif item.session_cn == "盘中":
+                bj_time_label += "左右"
         lines.append(
             f"- {item.symbol} | 北京时间: {bj_time_label}"
         )
