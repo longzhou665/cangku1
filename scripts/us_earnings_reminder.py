@@ -143,24 +143,27 @@ def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
     return rows
 
 
-def _hour_to_session(hour: str) -> tuple[str, time]:
+def _hour_to_session(hour: str) -> tuple[str, time | None]:
+    """Finnhub `hour` 通常只有 bmo/amc/dmh 会话标签，没有具体时刻。
+
+    不在文案里用 09:30/16:00 等锚点去“拼出”北京时间时分；无具体时刻时返回 None。
+    """
     normalized = (hour or "").strip().lower()
-    # Finnhub 有时 hour 为空/缺失，财报日历仍可能给出盘前事件；默认按 BMO 处理更贴近用户预期
     if not normalized:
-        normalized = "bmo"
+        # hour 缺失时仍按常见财报习惯归为盘前，但不杜撰具体钟点
+        return "盘前", None
     if normalized == "bmo":
-        # 按美股正式开盘时刻(09:30 ET)给出盘前提醒时间锚点
-        return "盘前", time(9, 30)
+        return "盘前", None
     if normalized == "amc":
-        # 按美股收盘时刻(16:00 ET)给出提醒时间锚点
-        return "盘后", time(16, 0)
+        return "盘后", None
     if normalized == "dmh":
-        return "盘中", time(12, 0)
-    return "未知", time(9, 30)
+        return "盘中", None
+    return "未知", None
 
 
 def _build_bj_time_hint(session_cn: str, dt_bj: datetime) -> str:
-    dt_text = dt_bj.strftime("%Y-%m-%d %H:%M")
+    # 仅展示日期 + 前/后/左右；具体时分以 Finnhub 若未来提供为准（当前不编造）
+    dt_text = dt_bj.strftime("%Y-%m-%d")
     if session_cn == "盘前":
         return f"{dt_text}前"
     if session_cn == "盘后":
@@ -204,11 +207,12 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
     hour = str(row.get("hour", "")).strip().lower()
     session_cn, event_time_et = _hour_to_session(hour)
 
-    dt_et = datetime.combine(
-        datetime.strptime(report_date_et, "%Y-%m-%d").date(),
-        event_time_et,
-        tzinfo=ET_TZ,
-    )
+    et_date = datetime.strptime(report_date_et, "%Y-%m-%d").date()
+    if event_time_et is None:
+        # 无具体钟点：用美东当日正午换算北京时间日期，减少跨日边界误差
+        dt_et = datetime.combine(et_date, time(12, 0), tzinfo=ET_TZ)
+    else:
+        dt_et = datetime.combine(et_date, event_time_et, tzinfo=ET_TZ)
     dt_bj = dt_et.astimezone(BJ_TZ)
 
     return EarningsEvent(
@@ -216,7 +220,9 @@ def _normalize_event(row: dict) -> EarningsEvent | None:
         report_date_et=report_date_et,
         session_cn=session_cn,
         report_date_bj=dt_bj.strftime("%Y-%m-%d"),
-        event_time_bj=dt_bj.strftime("%H:%M"),
+        event_time_bj=(
+            dt_bj.strftime("%H:%M") if event_time_et is not None else ""
+        ),
         bj_time_hint=_build_bj_time_hint(session_cn, dt_bj),
         eps_estimate=_fmt_number(row.get("epsEstimate")),
         revenue_estimate=_fmt_revenue(row.get("revenueEstimate")),
@@ -227,7 +233,11 @@ def _build_message(events: list[EarningsEvent]) -> str:
     today_bj = datetime.now(BJ_TZ).strftime("%Y-%m-%d")
     lines = [f"【美股财报提醒】北京时间 {today_bj}", ""]
     for _, item in events:
-        bj_time_label = f"{item.report_date_bj} {item.event_time_bj}"
+        parts = [item.report_date_bj]
+        et_t = (item.event_time_bj or "").strip()
+        if et_t:
+            parts.append(et_t)
+        bj_time_label = " ".join(parts)
         # 文案后缀以锚点北京时间为准，避免 session 字段异常时丢“前/后”
         hint = (item.bj_time_hint or "").strip()
         if hint.endswith("前"):
