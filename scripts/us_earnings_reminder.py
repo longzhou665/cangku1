@@ -128,6 +128,27 @@ def _parse_watchlist(raw: str) -> set[str]:
     return {x.strip().upper() for x in raw.split(",") if x.strip()}
 
 
+def _parse_earnings_hour_defaults() -> dict[str, str]:
+    """环境变量 EARNINGS_HOUR_DEFAULTS：Finnhub 日历常把 `hour` 置空，可按标的补 bmo/amc/dmh。
+
+    格式：`CRCL:bmo,ASTS:amc,HIMS:bmo`（逗号分隔，大小写不敏感）。仅当接口 `hour` 为空时生效。
+    """
+    raw = os.getenv("EARNINGS_HOUR_DEFAULTS", "").strip()
+    if not raw:
+        return {}
+    out: dict[str, str] = {}
+    for chunk in raw.split(","):
+        part = chunk.strip()
+        if not part or ":" not in part:
+            continue
+        sym, code = part.split(":", 1)
+        sym_u = sym.strip().upper()
+        code_l = code.strip().lower()
+        if sym_u and code_l in {"bmo", "amc", "dmh"}:
+            out[sym_u] = code_l
+    return out
+
+
 def _fetch_earnings(api_token: str, from_date: str, to_date: str) -> list[dict]:
     query = urllib.parse.urlencode(
         {"from": from_date, "to": to_date, "token": api_token}
@@ -212,13 +233,20 @@ def _fmt_revenue(value: object) -> str:
     return f"{sign}约 {abs_num:.0f} 美元"
 
 
-def _normalize_event(row: dict) -> EarningsEvent | None:
+def _normalize_event(
+    row: dict,
+    *,
+    hour_defaults: dict[str, str] | None = None,
+) -> EarningsEvent | None:
     symbol = str(row.get("symbol", "")).strip().upper()
     report_date_et = str(row.get("date", "")).strip()
     if not symbol or not report_date_et:
         return None
 
     hour = _normalize_finnhub_hour(row.get("hour"))
+    if not hour:
+        hmap = hour_defaults if hour_defaults is not None else _parse_earnings_hour_defaults()
+        hour = hmap.get(symbol, "")
     session_cn, event_time_et = _hour_to_session(hour)
 
     et_date = datetime.strptime(report_date_et, "%Y-%m-%d").date()
@@ -424,9 +452,14 @@ def main() -> int:
             )
             return 0
 
+    hour_defaults = _parse_earnings_hour_defaults()
+    if hour_defaults:
+        preview = ", ".join(f"{k}:{v}" for k, v in sorted(hour_defaults.items()))
+        print(f"EARNINGS_HOUR_DEFAULTS 已启用: {preview}")
+
     matched: list[tuple[int, EarningsEvent]] = []
     for row in rows:
-        event = _normalize_event(row)
+        event = _normalize_event(row, hour_defaults=hour_defaults)
         if not event:
             continue
         if event.symbol not in watchlist:

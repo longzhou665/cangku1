@@ -41,4 +41,5 @@ jobs:
           DEDUPE_WEBHOOKS: ${{ vars.DEDUPE_WEBHOOKS || 'true' }}
           LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '1' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '0' }}
+          EARNINGS_HOUR_DEFAULTS: ${{ vars.EARNINGS_HOUR_DEFAULTS || '' }}
         run: python scripts/us_earnings_reminder.py
