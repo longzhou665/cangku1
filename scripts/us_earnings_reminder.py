@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -460,6 +462,10 @@ def main() -> int:
 
     message = _build_message(pending)
     print(message)
+
+    if _optional_bool("SKIP_WEBHOOK", False):
+        print("SKIP_WEBHOOK=1, 已跳过 webhook 推送（仅本地/调试）")
+        return 0
 
     try:
         _push_webhook(
