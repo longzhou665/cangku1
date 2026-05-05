@@ -17,6 +17,9 @@ FMP_EARNINGS_CALENDAR = "https://financialmodelingprep.com/stable/earnings-calen
 ET_TZ = ZoneInfo("America/New_York")
 BJ_TZ = ZoneInfo("Asia/Shanghai")
 
+# 即使仍写在 GitHub Secret `EARNINGS_WHITELIST` 里，也不参与财报提醒的标的
+_SKIP_EARNINGS_SYMBOLS = frozenset({"CELH", "MGRM"})
+
 
 @dataclass
 class EarningsEvent:
@@ -437,8 +440,15 @@ def main() -> int:
         return 2
 
     watchlist = _parse_watchlist(watchlist_raw)
+    removed_skip = watchlist & _SKIP_EARNINGS_SYMBOLS
+    watchlist -= _SKIP_EARNINGS_SYMBOLS
+    if removed_skip:
+        print(
+            "已从本次提醒剔除(仓库固定, 与白名单无关): "
+            f"{', '.join(sorted(removed_skip))}"
+        )
     if not watchlist:
-        print("EARNINGS_WHITELIST 为空, 无需处理")
+        print("EARNINGS_WHITELIST 剔除固定标的后为空, 无需处理")
         return 0
 
     now_et_dt = datetime.now(ET_TZ)

@@ -24,7 +24,7 @@
 - `FINNHUB_API_TOKEN`：Finnhub API Token（`EARNINGS_DATA_SOURCE=finnhub` 或未设置时必填）
 - `FMP_API_KEY`：Financial Modeling Prep API Key（仅当 Variables 里 `EARNINGS_DATA_SOURCE=fmp` 时必填；在 [FMP 注册](https://site.financialmodelingprep.com/register) 获取）
 - `WEBHOOK_URL`：你的 webhook 地址
-- `EARNINGS_WHITELIST`：股票白名单，逗号分隔，例如 `AAPL,MSFT,NVDA,TSLA`
+- `EARNINGS_WHITELIST`：股票白名单，逗号分隔，例如 `AAPL,MSFT,NVDA,TSLA`（脚本内固定剔除 `CELH`、`MGRM`，不必从 Secret 白名单删除即可不再提醒）
 
 ### Variables（可选）
 
