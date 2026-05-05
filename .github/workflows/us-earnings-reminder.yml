@@ -1,18 +1,13 @@
 name: US Earnings Reminder
-# 多条 schedule cron 可能并发排队；串行避免共用 cache 状态时出现「同一天多次推送」竞态
+# schedule 与 workflow_dispatch 同时触发时串行，避免共用 cache 状态时竞态
 concurrency:
   group: us-earnings-reminder-${{ github.repository }}
   cancel-in-progress: false
 # refresh
 on:
   schedule:
-    # Target ~premarket in America/New_York via multiple UTC hours + minute offsets.
-    # The script does NOT hard-reject runs based on "expected UTC hour" (GitHub schedule can be delayed).
-    - cron: "0 8,9 * * 1-5"
-    # Extra minute buckets to reduce "missed window" risk when dispatch is delayed within the hour.
-    - cron: "15 8,9 * * 1-5"
-    - cron: "30 8,9 * * 1-5"
-    - cron: "45 8,9 * * 1-5"
+    # 每个美股工作日 1 次（UTC 08:00）。脚本对 schedule 不按 UTC 小时拒绝，仅排除美东周末。
+    - cron: "0 8 * * 1-5"
   workflow_dispatch:
 
 jobs:

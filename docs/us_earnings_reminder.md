@@ -44,8 +44,8 @@
 
 ## 运行方式
 
-- 自动：工作流在每个工作日于 `08/09 UTC` 的 `:00/:15/:30/:45` 触发（用于贴近美东早盘，并容忍 GitHub schedule 抖动）；workflow 已配置 `concurrency` 串行执行，避免多 cron 并发导致同一天多次 webhook
-- 脚本侧：`schedule` 触发只要落在美股工作日就会尝试执行；同一美东交易日成功执行后会写入 `premarket_day_success|et_day=...`，避免同一天因多 cron 重复跑
+- 自动：工作流在每个美股工作日 **UTC 08:00** 触发 1 次；`workflow_dispatch` 仍可随时手动跑。workflow 带 `concurrency`，与手动触发重叠时排队串行
+- 脚本侧：`schedule` 触发只要落在美股工作日就会尝试执行（**不按 UTC 时段拒绝**，避免 schedule 延迟导致整天不跑）；同一美东交易日成功后会写入 `premarket_day_success|et_day=...`，避免重复推送
 - 手动：在 GitHub Actions 页面使用 `workflow_dispatch` 触发
 
 ## 去重与状态
