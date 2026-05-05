@@ -477,6 +477,19 @@ def main() -> int:
     if not calendar_fixture:
         print(f"数据源: {data_source}")
 
+    state_path = _state_file_path()
+    et_day_run = now_et_dt.strftime("%Y-%m-%d")
+    # 必须在拉取远程日历之前判断：否则多条 GitHub schedule 并发时都会通过检查并各推一次 webhook
+    if premarket_only and is_scheduled and not is_manual_dispatch:
+        state_early = _load_sent_state(state_path)
+        sent_early = state_early.get("sent", {}) if isinstance(state_early, dict) else {}
+        day_success_key = _schedule_day_success_key(et_day_run)
+        if day_success_key in sent_early:
+            print(
+                f"本交易日已成功执行过一次, 跳过(含远程拉取与推送) | key={day_success_key} | github_event={event_name}"
+            )
+            return 0
+
     if calendar_fixture:
         print(f"使用本地日历 fixture(不请求远程日历): {calendar_fixture}")
         try:
@@ -538,18 +551,6 @@ def main() -> int:
                 "提示(FMP): 本批日历均无 hour/time 字段（免费档常见），"
                 "文案多为仅日期；可配置 EARNINGS_HOUR_DEFAULTS 或改用 Finnhub。"
             )
-
-    state_path = _state_file_path()
-    et_day_run = now_et_dt.strftime("%Y-%m-%d")
-    if premarket_only and is_scheduled and not is_manual_dispatch:
-        state = _load_sent_state(state_path)
-        sent_map = state.get("sent", {}) if isinstance(state, dict) else {}
-        day_success_key = _schedule_day_success_key(et_day_run)
-        if day_success_key in sent_map:
-            print(
-                f"本交易日盘前已成功执行过一次, 跳过重复运行 | key={day_success_key} | github_event={event_name}"
-            )
-            return 0
 
     hour_defaults = _parse_earnings_hour_defaults()
     if hour_defaults:

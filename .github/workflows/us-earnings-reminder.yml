@@ -1,4 +1,8 @@
 name: US Earnings Reminder
+# 多条 schedule cron 可能并发排队；串行避免共用 cache 状态时出现「同一天多次推送」竞态
+concurrency:
+  group: us-earnings-reminder-${{ github.repository }}
+  cancel-in-progress: false
 # refresh
 on:
   schedule:
