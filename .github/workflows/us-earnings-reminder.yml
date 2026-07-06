@@ -3,7 +3,6 @@ name: US Earnings Reminder
 concurrency:
   group: us-earnings-reminder-${{ github.repository }}
   cancel-in-progress: false
-# refresh
 on:
   schedule:
     # 每个美股工作日 1 次（UTC 08:00）。脚本对 schedule 不按 UTC 小时拒绝，仅排除美东周末。
