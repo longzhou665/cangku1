@@ -1,19 +1,33 @@
 {
   "name": "chat-ai-eval-kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "文字对话式 AI 产品标准评测交付物模板（promptfoo）",
+  "description": "内部知识助手（知策）标准评测交付物 + 可视化控制台",
   "scripts": {
     "eval": "promptfoo eval -c promptfooconfig.yaml",
     "eval:ci": "promptfoo eval -c promptfooconfig.yaml --no-cache -j 4",
     "view": "promptfoo view",
     "report": "node scripts/render-baseline-report.mjs",
-    "smoke": "promptfoo eval -c promptfooconfig.yaml --filter-metadata suite=smoke --no-cache"
+    "smoke": "promptfoo eval -c promptfooconfig.yaml --filter-metadata suite=smoke --no-cache",
+    "console:build": "vite build --config console/vite.config.js",
+    "console:dev": "concurrently -k -n api,ui -c green,cyan \"node server/index.mjs\" \"vite --config console/vite.config.js\"",
+    "console": "npm run console:build && node server/index.mjs",
+    "console:api": "node server/index.mjs"
   },
   "engines": {
     "node": ">=18"
   },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "devDependencies": {
-    "promptfoo": "^0.125.1"
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "promptfoo": "^0.125.1",
+    "vite": "^6.0.7"
   }
 }

@@ -75,7 +75,7 @@ function main() {
 
   const criticalFails = failRows.filter((r) => riskOf(r) === 'critical');
   const stamp = new Date().toISOString().slice(0, 10);
-  const product = process.env.EVAL_PRODUCT_NAME || '星河助手';
+  const product = process.env.EVAL_PRODUCT_NAME || '知策';
   const baselineId = process.env.EVAL_BASELINE_ID || `BL-${stamp.replace(/-/g, '')}-draft`;
 
   let md = `# 基线报告草稿 — ${product}\n\n`;

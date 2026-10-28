@@ -5,3 +5,5 @@ reports/latest-raw.json
 reports/baseline-BL-*-draft.md
 reports/baseline-latest.md
 !reports/samples/
+console/dist/
+.DS_Store
