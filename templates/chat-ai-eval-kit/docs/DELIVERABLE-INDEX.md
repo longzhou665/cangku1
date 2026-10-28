@@ -13,7 +13,9 @@
 | D07 | 失败归因手册 | [03-failure-playbook.md](./03-failure-playbook.md) | Top 模式可指导修复 |
 | D08 | 运行/交接/操作说明 | [../README.md](../README.md)、[06-client-handoff.md](./06-client-handoff.md)、[ops-guide.md](./ops-guide.md) | 客户能独立维护 |
 | D09 | 验收清单 | [05-acceptance-checklist.md](./05-acceptance-checklist.md) | 勾选关闭 |
-| **控制台** | 可视化全流程 | `npm run console` → http://127.0.0.1:8787 | 概览/用例/评测/报告/配置/说明可用 |
+| **使用说明** | 完整使用手册 | [USER-GUIDE.md](./USER-GUIDE.md) | 业务/质量可独立操作 |
+| **技术说明** | 架构 / API / 扩展 | [TECHNICAL.md](./TECHNICAL.md) | 实施/测开可对接与二次开发 |
+| **控制台** | 可视化全流程 + 文档中心 | `npm run console` → http://127.0.0.1:8787 | 概览/用例/评测/报告/配置/文档可用 |
 
 ## 用例覆盖（默认）
 

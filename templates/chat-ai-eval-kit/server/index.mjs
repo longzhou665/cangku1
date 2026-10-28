@@ -17,9 +17,56 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CASES_DIR = path.join(ROOT, 'cases');
 const PROMPT_PATH = path.join(ROOT, 'prompts', 'system.md');
-const GUIDE_PATH = path.join(ROOT, 'docs', 'ops-guide.md');
+const DOCS_DIR = path.join(ROOT, 'docs');
+const GUIDE_PATH = path.join(DOCS_DIR, 'ops-guide.md');
 const RAW_REPORT = path.join(ROOT, 'reports', 'latest-raw.json');
 const PORT = Number(process.env.CONSOLE_PORT || 8787);
+
+/** 控制台可展示的文档白名单（不含路径穿越） */
+const DOC_CATALOG = [
+  {
+    id: 'USER-GUIDE',
+    title: '使用说明',
+    file: 'USER-GUIDE.md',
+    audience: '质量 / 业务',
+  },
+  {
+    id: 'TECHNICAL',
+    title: '技术说明',
+    file: 'TECHNICAL.md',
+    audience: '实施 / 测开',
+  },
+  {
+    id: 'ops-guide',
+    title: '控制台速查',
+    file: 'ops-guide.md',
+    audience: '日常操作',
+  },
+  {
+    id: 'DELIVERABLE-INDEX',
+    title: '交付物索引',
+    file: 'DELIVERABLE-INDEX.md',
+    audience: '验收',
+  },
+  {
+    id: '01-success-criteria',
+    title: '成功标准 (D01)',
+    file: '01-success-criteria.md',
+    audience: '验收',
+  },
+  {
+    id: '02-scorer-and-assertions',
+    title: '断言说明 (D02)',
+    file: '02-scorer-and-assertions.md',
+    audience: '质量',
+  },
+  {
+    id: '03-failure-playbook',
+    title: '失败归因 (D07)',
+    file: '03-failure-playbook.md',
+    audience: '质量',
+  },
+];
 
 const jobs = new Map();
 
@@ -305,6 +352,27 @@ app.get('/api/guide', async (_req, res) => {
   try {
     const content = await fs.readFile(GUIDE_PATH, 'utf8');
     res.type('text/markdown').send(content);
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+app.get('/api/docs', (_req, res) => {
+  res.json({ docs: DOC_CATALOG });
+});
+
+app.get('/api/docs/:id', async (req, res) => {
+  try {
+    const entry = DOC_CATALOG.find((d) => d.id === req.params.id);
+    if (!entry) {
+      return res.status(404).json({ error: '文档不存在' });
+    }
+    const abs = path.join(DOCS_DIR, entry.file);
+    if (!abs.startsWith(DOCS_DIR)) {
+      return res.status(400).json({ error: '非法路径' });
+    }
+    const content = await fs.readFile(abs, 'utf8');
+    res.json({ ...entry, content });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }

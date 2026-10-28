@@ -7,7 +7,7 @@ const NAV = [
   { id: 'eval', label: '评测' },
   { id: 'report', label: '报告' },
   { id: 'config', label: '配置' },
-  { id: 'guide', label: '操作说明' },
+  { id: 'guide', label: '文档' },
 ];
 
 const CATEGORIES = ['happy', 'edge', 'adversarial', 'refuse', 'multi-turn', 'smoke'];
@@ -601,20 +601,56 @@ function ConfigPage({ toast }) {
 }
 
 function GuidePage({ toast }) {
+  const [catalog, setCatalog] = useState([]);
+  const [docId, setDocId] = useState('USER-GUIDE');
   const [md, setMd] = useState('加载中…');
+  const [meta, setMeta] = useState(null);
+
   useEffect(() => {
     api
-      .getGuide()
-      .then(setMd)
+      .listDocs()
+      .then((d) => setCatalog(d.docs || []))
+      .catch((e) => toast(e.message));
+  }, [toast]);
+
+  useEffect(() => {
+    setMd('加载中…');
+    api
+      .getDoc(docId)
+      .then((d) => {
+        setMeta(d);
+        setMd(d.content || '');
+      })
       .catch((e) => {
         toast(e.message);
-        setMd('无法加载操作说明');
+        setMd('无法加载文档');
       });
-  }, [toast]);
+  }, [docId, toast]);
+
   return (
     <section>
-      <h1 className="page-title">操作说明</h1>
-      <p className="page-desc">全流程操作手册（与 docs/ops-guide.md 同步）。</p>
+      <h1 className="page-title">文档中心</h1>
+      <p className="page-desc">
+        使用说明、技术说明与交付文档。源文件在仓库 <code>docs/</code>，可与控制台同步查阅。
+      </p>
+      <div className="filters">
+        {catalog.map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            className={`btn ${docId === d.id ? 'primary' : ''}`}
+            onClick={() => setDocId(d.id)}
+            title={d.audience}
+          >
+            {d.title}
+          </button>
+        ))}
+      </div>
+      {meta && (
+        <p className="muted" style={{ marginBottom: 12 }}>
+          文件：docs/{meta.file}　面向：{meta.audience}
+        </p>
+      )}
       <div className="panel guide">{simpleMarkdown(md)}</div>
     </section>
   );

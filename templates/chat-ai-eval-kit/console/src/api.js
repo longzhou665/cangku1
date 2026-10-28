@@ -37,6 +37,8 @@ export const api = {
     if (!res.ok) throw new Error('无法加载操作说明');
     return res.text();
   },
+  listDocs: () => request('/api/docs'),
+  getDoc: (id) => request(`/api/docs/${encodeURIComponent(id)}`),
   getReport: () => request('/api/report/latest'),
   renderReport: () => request('/api/report/render', { method: 'POST' }),
   startEval: (mode) =>

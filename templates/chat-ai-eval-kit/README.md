@@ -14,7 +14,7 @@ npm run console
 
 浏览器打开：**http://127.0.0.1:8787**
 
-页面包含：概览 → 用例 → 评测 → 报告 → 配置 → **操作说明**。
+页面包含：概览 → 用例 → 评测 → 报告 → 配置 → **文档**（使用说明 / 技术说明等）。
 
 开发热更新：
 
@@ -23,7 +23,16 @@ npm run console:dev
 # UI http://127.0.0.1:5173  |  API http://127.0.0.1:8787
 ```
 
-详细步骤见 [docs/ops-guide.md](./docs/ops-guide.md)（控制台内「操作说明」页同源）。
+## 文档入口（必读）
+
+| 文档 | 适合谁 | 路径 |
+|------|--------|------|
+| **使用说明** | 质量 / 业务 / 交付 | [docs/USER-GUIDE.md](./docs/USER-GUIDE.md) |
+| **技术说明** | 实施 / 测开 / 二次开发 | [docs/TECHNICAL.md](./docs/TECHNICAL.md) |
+| 控制台速查 | 日常点点看 | [docs/ops-guide.md](./docs/ops-guide.md) |
+| 交付物总表 | 验收打包 | [docs/DELIVERABLE-INDEX.md](./docs/DELIVERABLE-INDEX.md) |
+
+控制台内「文档」页可直接切换阅读上述手册（与 `docs/` 同源）。
 
 ## 交付物一览（D01–D09）
 
