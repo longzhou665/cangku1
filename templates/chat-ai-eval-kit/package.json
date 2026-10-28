@@ -1,0 +1,19 @@
+{
+  "name": "chat-ai-eval-kit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "文字对话式 AI 产品标准评测交付物模板（promptfoo）",
+  "scripts": {
+    "eval": "promptfoo eval -c promptfooconfig.yaml",
+    "eval:ci": "promptfoo eval -c promptfooconfig.yaml --no-cache -j 4",
+    "view": "promptfoo view",
+    "report": "node scripts/render-baseline-report.mjs",
+    "smoke": "promptfoo eval -c promptfooconfig.yaml --filter-metadata suite=smoke --no-cache"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "promptfoo": "^0.125.1"
+  }
+}

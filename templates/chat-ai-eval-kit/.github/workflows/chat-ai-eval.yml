@@ -1,0 +1,47 @@
+name: chat-ai-eval
+
+on:
+  pull_request:
+    paths:
+      - "templates/chat-ai-eval-kit/**"
+      - ".github/workflows/chat-ai-eval.yml"
+  push:
+    branches: [main]
+    paths:
+      - "templates/chat-ai-eval-kit/**"
+      - ".github/workflows/chat-ai-eval.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: templates/chat-ai-eval-kit
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: templates/chat-ai-eval-kit/package-lock.json
+
+      - name: Install
+        run: npm install
+
+      - name: Run full eval (mock provider)
+        run: npm run eval:ci
+
+      - name: Render baseline draft
+        run: npm run report
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-ai-eval-reports
+          path: |
+            templates/chat-ai-eval-kit/reports/

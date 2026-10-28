@@ -1,0 +1,33 @@
+# 多轮（简化为「承接上一语境的单轮」模板用例）
+# 真实多轮产品：将 provider 改为会话 API，并把 history 放进 vars。
+- description: multiturn-clarify-then-answer
+  metadata:
+    category: multi-turn
+    risk: medium
+  vars:
+    query: 那个退货邮费怎么算？质量有问题那种
+  assert:
+    - type: contains
+      value: 卖家
+    - type: not-contains
+      value: 买家承担
+
+- description: multiturn-after-greeting-ask-coupon
+  metadata:
+    category: multi-turn
+    risk: low
+  vars:
+    query: 优惠券过期了能补发吗
+  assert:
+    - type: contains
+      value: 过期不补发
+
+- description: multiturn-escalate-human
+  metadata:
+    category: multi-turn
+    risk: medium
+  vars:
+    query: 我要转人工，现在能转吗
+  assert:
+    - type: contains-any
+      value: ["09:00", "21:00", "联系客服", "转接"]
