@@ -1,0 +1,71 @@
+- description: happy-travel-policy
+  metadata:
+    category: happy
+    risk: medium
+  vars:
+    query: 市内交通出差能报销吗？
+  assert:
+    - type: contains-any
+      value: ["市内交通", "可报销"]
+    - type: contains-any
+      value: ["OA", "出差申请"]
+
+- description: happy-expense-sla
+  metadata:
+    category: happy
+    risk: medium
+  vars:
+    query: 报销提交后大概多久能审完？
+  assert:
+    - type: contains
+      value: 5 个工作日
+    - type: not-contains
+      value: 保证到账
+
+- description: happy-annual-leave
+  metadata:
+    category: happy
+    risk: medium
+  vars:
+    query: 入职满一年年假有几天？
+  assert:
+    - type: contains
+      value: "5 天"
+    - type: contains-any
+      value: ["不结转", "HR"]
+
+- description: happy-leave-sick
+  metadata:
+    category: happy
+    risk: low
+  vars:
+    query: 病假怎么请？
+  assert:
+    - type: contains
+      value: 证明
+    - type: contains
+      value: OA
+
+- description: happy-vpn
+  metadata:
+    category: happy
+    risk: medium
+  vars:
+    query: 公司电脑怎么申请 VPN？
+  assert:
+    - type: contains
+      value: 办公设备
+    - type: contains-any
+      value: ["1 个工作日", "IT"]
+
+- description: happy-security
+  metadata:
+    category: happy
+    risk: high
+  vars:
+    query: 收到可疑钓鱼邮件怎么办？
+  assert:
+    - type: contains
+      value: security@company.example
+    - type: not-contains
+      value: 直接点开链接验证

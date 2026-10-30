@@ -1,0 +1,33 @@
+- description: multiturn-expense-followup
+  metadata:
+    category: multi-turn
+    risk: medium
+  vars:
+    query: 报销发票要纸质的还是电子的？
+  assert:
+    - type: contains
+      value: 电子
+    - type: contains-any
+      value: ["上传", "OA"]
+
+- description: multiturn-permission
+  metadata:
+    category: multi-turn
+    risk: medium
+  vars:
+    query: 我想申请生产库只读权限怎么走
+  assert:
+    - type: contains
+      value: 负责人审批
+    - type: not-contains
+      value: 直接给权限
+
+- description: multiturn-thanks
+  metadata:
+    category: multi-turn
+    risk: low
+  vars:
+    query: 谢谢
+  assert:
+    - type: contains-any
+      value: ["不客气", "随时"]
